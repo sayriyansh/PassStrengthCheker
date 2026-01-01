@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""
+Password Strength Checker - Main Program
+
+A beginner-friendly password analysis tool that checks password strength
+and estimates how long it would take to crack.
+"""
+
+import sys
+import time
+from pathlib import Path
+
+# Import our custom modules
+from strength_analyzer import (
+    check_length,
+    check_character_types,
+    check_common_patterns,
+    calculate_password_score,
+    get_strength_level
+)
+from time_estimator import estimate_time_to_crack, format_time
+
+
+def main():
+    """Main program function."""
+    print("🔐 Password Strength Checker")
+    print("=" * 50)
+    
+    # Check if user provided command line arguments
+    if len(sys.argv) > 1:
+        # Handle command line mode
+        if sys.argv[1] == "--password" and len(sys.argv) > 2:
+            password = sys.argv[2]
+            analyze_password(password)
+        elif sys.argv[1] == "--file" and len(sys.argv) > 2:
+            file_path = sys.argv[2]
+            analyze_passwords_from_file(file_path)
+        else:
+            print("Usage:")
+            print("  python password_checker.py                    # Interactive mode")
+            print("  python password_checker.py --password 'mypassword'")
+            print("  python password_checker.py --file passwords.txt")
+    else:
+        # Interactive mode
+        interactive_mode()
+
+
+def interactive_mode():
+    """Run in interactive mode - ask user for passwords."""
+    print("\nInteractive Mode - Enter passwords to check their strength")
+    print("Type 'quit' to exit\n")
+    
+    while True:
+        try:
+            # Get password from user
+            password = input("Enter a password to check: ").strip()
+            
+            # Check if user wants to quit
+            if password.lower() == 'quit':
+                print("Goodbye! 👋")
+                break
+            
+            # Analyze the password
+            analyze_password(password)
+            print()  # Empty line for readability
+            
+        except KeyboardInterrupt:
+            print("\nGoodbye! 👋")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
+
+
+def analyze_password(password):
+    """
+    Analyze a single password and display results.
+    
+    Args:
+        password: The password to analyze
+    """
+    if not password:
+        print("❌ Please enter a password!")
+        return
+    
+    print(f"\nAnalyzing password: {'*' * len(password)}")
+    print("-" * 40)
+    
+    # Check different aspects of the password
+    length_result = check_length(password)
+    char_types = check_character_types(password)
+    pattern_issues = check_common_patterns(password)
+    
+    # Display detailed analysis
+    print(f"Length: {len(password)} characters")
+    print(f"  {length_result}")
+    
+    print(f"\nCharacter Types Used: {char_types['count']}/4")
+    for char_type, has_it in char_types['types'].items():
+        status = "✓" if has_it else "✗"
+        print(f"  {status} {char_type.replace('_', ' ').title()}")
+    
+    if pattern_issues:
+        print(f"\n⚠️  Potential Issues Found:")
+        for issue in pattern_issues:
+            print(f"  - {issue}")
+    else:
+        print(f"\n✅ No common patterns detected")
+    
+    # Calculate overall score
+    score = calculate_password_score(password)
+    level = get_strength_level(score)
+    
+    print(f"\nStrength Score: {score}/100")
+    print(f"Strength Level: {level['label']}")
+    print(f"Description: {level['description']}")
+    
+    # Estimate time to crack
+    time_seconds = estimate_time_to_crack(password)
+    time_formatted = format_time(time_seconds)
+    
+    print(f"\nTime to Crack:")
+    print(f"  {time_formatted}")
+    
+    # Provide suggestions
+    provide_suggestions(password, score, char_types)
+
+
+def analyze_passwords_from_file(file_path):
+    """
+    Analyze multiple passwords from a file.
+    
+    Args:
+        file_path: Path to file containing passwords (one per line)
+    """
+    try:
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            print(f"❌ File not found: {file_path}")
+            return
+        
+        print(f"\nAnalyzing passwords from: {file_path}")
+        print("=" * 50)
+        
+        with open(file_path, 'r', encoding='utf-8') as file:
+            passwords = file.readlines()
+        
+        for i, password in enumerate(passwords, 1):
+            password = password.strip()
+            if password and not password.startswith('#'):
+                print(f"\nPassword {i}: {'*' * len(password)}")
+                analyze_password(password)
+                print("-" * 40)
+        
+        print(f"\n✅ Analyzed {len([p for p in passwords if p.strip() and not p.strip().startswith('#')])} passwords")
+        
+    except Exception as e:
+        print(f"❌ Error reading file: {e}")
+
+
+def provide_suggestions(password, score, char_types):
+    """
+    Provide suggestions to improve password strength.
+    
+    Args:
+        password: The password being analyzed
+        score: Current strength score
+        char_types: Character type analysis
+    """
+    suggestions = []
+    
+    # Length suggestions
+    if len(password) < 8:
+        suggestions.append("Make it at least 8 characters long")
+    elif len(password) < 12:
+        suggestions.append("Consider making it longer (12+ characters)")
+    
+    # Character variety suggestions
+    if not char_types['types']['has_lowercase']:
+        suggestions.append("Add lowercase letters (a-z)")
+    if not char_types['types']['has_uppercase']:
+        suggestions.append("Add uppercase letters (A-Z)")
+    if not char_types['types']['has_numbers']:
+        suggestions.append("Add numbers (0-9)")
+    if not char_types['types']['has_symbols']:
+        suggestions.append("Add symbols (!@#$%^&*)")
+    
+    # Pattern suggestions
+    if score < 50:
+        suggestions.append("Avoid common words and patterns")
+        suggestions.append("Don't use personal information")
+    
+    # Display suggestions
+    if suggestions:
+        print(f"\n💡 Suggestions to improve:")
+        for i, suggestion in enumerate(suggestions, 1):
+            print(f"  {i}. {suggestion}")
+    else:
+        print(f"\n🎉 Great password! No suggestions needed.")
+
+
+if __name__ == "__main__":
+    main()
